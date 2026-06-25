@@ -12,8 +12,9 @@ preview behavior closer to the normal node rules while Qortium is still changing
 quickly.
 
 For the public tester walkthrough, start with
-[TESTER-GUIDE.md](TESTER-GUIDE.md). This file is the more detailed technical
-reference for the preview profile and seed-node operation.
+[TESTER-GUIDE.md](TESTER-GUIDE.md). Seed operators should use
+[OPERATOR-RUNBOOK.md](OPERATOR-RUNBOOK.md). This file is the more detailed
+technical reference for the preview profile itself.
 
 ## Current State
 
@@ -86,6 +87,9 @@ Reset generated preview runtime files:
 
 ## Start The VPS Seeds
 
+Seed operators should also read [OPERATOR-RUNBOOK.md](OPERATOR-RUNBOOK.md)
+before updating, restarting, or resetting public seed nodes.
+
 On the Regxa seed VPS, use the Regxa seed profile:
 
 ```sh
@@ -106,20 +110,35 @@ nodes.
 
 ## Ports
 
-The preview profile reuses the `623xx` test-network port range:
+The preview profile uses the `248xx` test/preview-network port range:
 
-- API: `62391`
-- P2P: `62392`
-- QDN/data: `62394`
+- API: `24891`
+- P2P: `24892`
+- QDN/data: `24894`
 
 Participant nodes allow normal local transaction-builder API calls so testers
 can create payments, group joins, chain-parameter proposals, and other signed
-transactions through their own local node. The public seed profiles stay API
-restricted. All preview profiles keep the API whitelisted for local access only.
+transactions through their own local node. Preview participant and seed nodes
+also expose a public read-only API allowlist by default so Qortium Home and
+other clients can discover useful public nodes, browse QDN resources, and read
+common chain data without needing the local API key. Public write, admin,
+utility, list-management, and peer mutation routes are still blocked unless the
+request comes from the local API whitelist.
 
-For a public VPS, firewall the API port unless you intentionally need remote
-administration. Public preview peers need to reach the P2P port, and QDN/data
-peers need to reach the QDN port.
+The public seed profiles remain API restricted for local transaction-builder
+style endpoints, but also serve the same public read and QDN browsing allowlist
+so the initial preview network has known public API nodes available.
+
+Auto-update is explicitly off in the tracked preview settings templates.
+Operators can enable it in a local runtime settings file when testing approved
+QDN update manifests, but public preview defaults do not automatically install
+new jars. The preview launcher preserves a local `autoUpdateMode` override when
+restarting from the tracked template.
+
+For a public VPS, expose the API port only if you want that public read-only
+access. Public preview peers need to reach the P2P port, and QDN/data peers
+need to reach the QDN port. On a home network, router or firewall forwarding is
+still required before other users can reach ports `24891`, `24892`, or `24894`.
 
 ## Runtime Files
 
@@ -137,9 +156,12 @@ Generated runtime files include:
 - `qortium-backup/`
 - `qortium-backup-preview/`
 - `run.log`
+  - Unix launcher details and Java stdout/stderr; Windows Java stdout
 - `run-error.log`
+  - Windows Java stderr capture
 - `run.pid`
 - `qortium.log`
+  - the main application log written by Log4j
 - `QortiumKeyStore.jks`
 - `apikey.txt`
 
@@ -159,10 +181,18 @@ If the jar has already been built, skip the build step:
 ./preview/package-release.sh --skip-build
 ```
 
+Before uploading the zip, smoke-check that the extracted package creates the
+expected runtime logs:
+
+```sh
+./preview/smoke-release-logging.sh --package=target/qortium-preview.zip
+```
+
 The default output is `target/qortium-preview.zip`. The package includes the
 jar, preview configs, Unix shell scripts, Windows wrappers, and the public
-tester guide. It intentionally excludes generated runtime files, local settings,
-databases, logs, API keys, keystores, backups, and ignored preview secrets.
+tester and operator guides. It intentionally excludes generated runtime files,
+local settings, databases, logs, API keys, keystores, backups, and ignored
+preview secrets.
 
 ## Launch Minting
 
@@ -186,7 +216,7 @@ curl -X POST \
   -H "X-API-KEY: $(cat preview/apikey.txt)" \
   -H "Content-Type: text/plain" \
   --data "MINTING_PRIVATE_KEY_FROM_PREVIEW_SECRETS" \
-  http://127.0.0.1:62391/admin/mintingaccounts
+  http://127.0.0.1:24891/admin/mintingaccounts
 ```
 
 Use the `mintingPrivateKey` value from the ignored secrets file. Do not use the

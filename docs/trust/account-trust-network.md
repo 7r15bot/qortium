@@ -14,7 +14,7 @@ For the current launch checklist, see
 
 ## Why It Exists
 
-The basic Qortal-style model gives more governance weight to accounts that have
+The older blocks-minted-only model gives more governance weight to accounts that have
 minted more blocks. That works best when each minting account represents a real
 participant. It becomes weaker when one operator can run many accounts, earn
 `blocksMinted` on all of them, and then use those accounts as a voting bloc.
@@ -225,7 +225,7 @@ and signed support-removal orphaning.
 There is also an opt-in benchmark for larger generated graphs and rating churn:
 
 ```bash
-mvn test -DskipJUnitTests=false -Dqortium.runLongTrustNetworkTests=true -Dtest=org.qortal.test.rating.AccountTrustScaleTests
+mvn test -DskipJUnitTests=false -Dqortium.runLongTrustNetworkTests=true -Dtest=AccountTrustScaleTests
 ```
 
 A local benchmark run on the current implementation produced these reference

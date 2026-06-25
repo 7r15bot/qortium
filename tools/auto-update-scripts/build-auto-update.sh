@@ -9,6 +9,7 @@ LOG_FILE=""
 DRY_RUN=false
 RUN_PUBLISH=false
 PUBLISH_SCRIPT="tools/auto-update-scripts/publish-auto-update.py"
+PUBLISH_PREVIEW_FLAG=""
 
 # === Helper Functions ===
 function abort() {
@@ -65,6 +66,10 @@ fi
 read -rp "Run the QDN auto-update publisher script at the end? (y/N): " pub_choice
 if [[ "${pub_choice}" =~ ^[Yy]$ ]]; then
   RUN_PUBLISH=true
+  read -rp "Use preview network publish defaults? (y/N): " pub_preview
+  if [[ "${pub_preview}" =~ ^[Yy]$ ]]; then
+    PUBLISH_PREVIEW_FLAG="--preview"
+  fi
   read -rp "Run Python script in dry-run mode? (y/N): " pub_dry
   if [[ "${pub_dry}" =~ ^[Yy]$ ]]; then
     PUBLISH_DRY_FLAG="--dry-run"
@@ -191,7 +196,7 @@ jar_file="${jar_files[0]:-}"
 
 # === XOR Obfuscation ===
 echo "Creating ${project}.update..."
-$DRY_RUN || java -cp "${jar_file}" org.qortal.XorUpdate "${jar_file}" "${project}.update"
+$DRY_RUN || java -cp "${jar_file}" org.qortium.XorUpdate "${jar_file}" "${project}.update"
 
 echo "Done. ${project}.update is ready for QDN publishing."
 
@@ -232,11 +237,17 @@ if $RUN_PUBLISH; then
 
     if [[ "${PUBLISH_DRY_FLAG}" == "--dry-run" ]]; then
       echo "Dry-run mode active for Python script."
-      python3 "${PUBLISH_SCRIPT}" "${PRIVATE_KEY}" "${short_hash}" --dry-run
+      publish_args=("${PRIVATE_KEY}" "${short_hash}" "--dry-run")
     else
       echo "Publishing auto-update for real..."
-      python3 "${PUBLISH_SCRIPT}" "${PRIVATE_KEY}" "${short_hash}"
+      publish_args=("${PRIVATE_KEY}" "${short_hash}")
     fi
+
+    if [[ "${PUBLISH_PREVIEW_FLAG}" == "--preview" ]]; then
+      publish_args+=("--preview")
+    fi
+
+    python3 "${PUBLISH_SCRIPT}" "${publish_args[@]}"
   else
     echo "WARNING: Python script not found at ${PUBLISH_SCRIPT}. Skipping."
   fi

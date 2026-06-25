@@ -1,10 +1,10 @@
 {
-  "listenPort": 62392,
-  "listenDataPort": 62394,
-  "apiPort": 62391,
+  "listenPort": 24892,
+  "listenDataPort": 24894,
+  "apiPort": 24891,
   "isTestNet": true,
   "singleNodeTestnet": false,
-  "minPeerVersion": "6.1.0",
+  "minPeerVersion": "1.0.0",
   "allowConnectionsWithOlderPeerVersions": false,
   "ourExternalIpAddress": "146.103.42.59",
   "bitcoinyNetworks": {
@@ -34,7 +34,7 @@
   "dataPath": "data-preview",
   "blockchainConfig": "previewchain.json",
   "minBlockchainPeers": 1,
-  "minOutboundPeers": 1,
+  "minOutboundPeers": 2,
   "maxPeers": 32,
   "maxDataPeers": 32,
   "maxNetworkThreadPoolSize": 128,
@@ -42,15 +42,41 @@
   "uPnPEnabled": false,
   "apiDocumentationEnabled": false,
   "apiRestricted": true,
+  "publicApiWhitelistEnabled": true,
+  "publicApiWhitelist": [
+    "0.0.0.0/0",
+    "::/0"
+  ],
+  "publicApiPaths": [
+    "GET /admin/status",
+    "GET /peers/known",
+    "GET /arbitrary/*",
+    "GET /render/*",
+    "GET /names/*",
+    "GET /addresses/*",
+    "GET /blocks/*",
+    "GET /transactions/*",
+    "GET /groups/*",
+    "GET /assets/*",
+    "GET /polls/*",
+    "GET /chat/*",
+    "GET /chain-parameters/*",
+    "GET /account-ratings/*",
+    "GET /resource-ratings/*",
+    "GET /at/*",
+    "GET /stats/*"
+  ],
   "bootstrap": false,
   "maxPeerConnectionTime": 999999999,
   "recoveryModeTimeout": 0,
+  "autoUpdateMode": "OFF",
   "qdnEnabled": true,
   "relayModeEnabled": true,
+  "qdnAuthBypassEnabled": true,
   "maxStorageCapacity": 10737418240,
   "storagePolicy": "FOLLOWED_OR_VIEWED",
   "initialPeers": [
-    "185.207.104.78:62392"
+    "185.207.104.78:24892"
   ],
   "uiLocalServers": [
     "localhost",

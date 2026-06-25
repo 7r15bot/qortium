@@ -20,7 +20,7 @@
     <ROW Property="ARPSYSTEMCOMPONENT" Value="1"/>
     <ROW Property="ARPURLINFOABOUT" Value="https://github.com/QuickMythril/qortium"/>
     <ROW Property="AiWinUI" MultiBuildValue="DefaultBuild:1"/>
-    <ROW Property="BannerBitmap" Value="banner.jpg" MultiBuildValue="DefaultBuild:NiceQortiumLogocrop.png" Type="1" MsiKey="BannerBitmap"/>
+    <ROW Property="BannerBitmap" Value="banner.jpg" MultiBuildValue="DefaultBuild:QortiumInstallerBanner.png" Type="1" MsiKey="BannerBitmap"/>
     <ROW Property="DATA_PATH" Value="will-be-overwritten"/>
     <ROW Property="DefaultUIFont" Value="TextStyle" Type="2" Options="65536" MsiKey="DefaultUIFont"/>
     <ROW Property="Magistral" Value="TextStyle" Type="2"/>
@@ -30,10 +30,10 @@
     <ROW Property="ProductCode" Value="1028:{8103A65F-45DB-43F2-94FD-A108B2967460} 1031:{F34CE1B5-5CEF-4817-A7C6-20E06D766C6F} 1033:{F9C19AD5-80B7-4259-B7B0-405A5BF10796} 1035:{9C67D499-75C4-4CDC-996F-0F7C2035DF00} 1036:{69D3A6FD-0061-4F0F-BACE-6B05E25CBDEA} 1038:{195A9845-073D-4D69-AC6F-4A85EC66FC39} 1040:{C5747600-D8B3-4B73-863D-A189F10F663D} 1041:{5F3855BB-BC8D-41C8-B855-CB0FB9B55D07} 1042:{5CE41E16-CF45-4070-8949-37420B856E7F} 1043:{8AF6CA46-99C0-4A15-9695-350B9FD96A02} 1045:{4F86D007-3DE8-4C6A-972F-78BE0B03F7AA} 1049:{1259EB9B-FC92-41AA-A4AC-E1AC14129453} 1053:{F18D94B6-CE95-41BB-B03D-0F29E3ECD975} 2052:{B3A035DA-BF2A-41DC-AF79-17B6E3DBDAC1} 2057:{920476FE-26A3-4142-B18F-8B6319862AD1} 3082:{59E5BD08-547B-4A71-942C-340077983BA5} " Type="16"/>
     <ROW Property="ProductLanguage" Value="2057"/>
     <ROW Property="ProductName" Value="Qortium"/>
-    <ROW Property="ProductVersion" Value="6.1.4"/>
+    <ROW Property="ProductVersion" Value="1.0.0"/>
     <ROW Property="RECONFIG_NTP" Value="true"/>
     <ROW Property="SecureCustomProperties" Value="OLDPRODUCTS;AI_NEWERPRODUCTFOUND;AI_SETUPEXEPATH;SETUPEXEDIR"/>
-    <ROW Property="TabBackground" Value="NiceQortiumLogo.png" Type="1" MsiKey="TabBackground"/>
+    <ROW Property="TabBackground" Value="QortiumInstallerBackground.png" Type="1" MsiKey="TabBackground"/>
     <ROW Property="UpgradeCode" Value="{6733900D-8500-41E3-8C06-EC9236C17FC8}"/>
     <ROW Property="WindowsType9X" MultiBuildValue="DefaultBuild:Windows 9x/ME" ValueLocId="-"/>
     <ROW Property="WindowsType9XDisplay" MultiBuildValue="DefaultBuild:Windows 9x/ME" ValueLocId="-"/>
@@ -45,7 +45,7 @@
     <ROW Property="WindowsTypeNT5X" MultiBuildValue="DefaultBuild:Windows XP/2003" ValueLocId="-"/>
     <ROW Property="WindowsTypeNT5XDisplay" MultiBuildValue="DefaultBuild:Windows XP/2003" ValueLocId="-"/>
     <ROW Property="WindowsTypeNTDisplay" MultiBuildValue="DefaultBuild:32-bit Windows versions" ValueLocId="-"/>
-    <ROW Property="test" Value="NiceQortiumLogo.png" Type="1"/>
+    <ROW Property="test" Value="QortiumInstallerBackground.png" Type="1"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiDirsComponent">
     <ROW Directory="APPDIR" Directory_Parent="TARGETDIR" DefaultDir="APPDIR:." IsPseudoRoot="1" DirectoryOptions="15"/>
@@ -973,8 +973,8 @@
   <COMPONENT cid="caphyon.advinst.msicomp.MsiBinaryComponent">
     <ROW Name="ExternalUICleaner.dll" SourcePath="&lt;AI_CUSTACTS&gt;ExternalUICleaner.dll"/>
     <ROW Name="NetFirewall.dll" SourcePath="&lt;AI_CUSTACTS&gt;NetFirewall.dll"/>
-    <ROW Name="NiceQortiumLogo.png" SourcePath="Nice-Qortium-Logo-crop.png"/>
-    <ROW Name="NiceQortiumLogocrop.png" SourcePath="Nice-Qortium-Logo-crop.png"/>
+    <ROW Name="QortiumInstallerBackground.png" SourcePath="qortium-installer-banner.png"/>
+    <ROW Name="QortiumInstallerBanner.png" SourcePath="qortium-installer-banner.png"/>
     <ROW Name="Prereq.dll" SourcePath="&lt;AI_CUSTACTS&gt;Prereq.dll"/>
     <ROW Name="ResourceCleaner.dll" SourcePath="&lt;AI_CUSTACTS&gt;ResourceCleaner.dll"/>
     <ROW Name="SoftwareDetector.dll" SourcePath="&lt;AI_CUSTACTS&gt;SoftwareDetector.dll"/>
@@ -1348,7 +1348,7 @@
     <ROW IniFile="FailureCheck" FileName="Qortium.ini" DirProperty="APPDIR" Section="Application" Key="Failure Check" Value="yes" Action="0" Component_="Qortium.exe"/>
     <ROW IniFile="JVMSource" FileName="Qortium.ini" DirProperty="APPDIR" Section="Java Runtime Environment" Key="JVM Source" Value="favor_JDK" Action="0" Component_="Qortium.exe"/>
     <ROW IniFile="JVMType" FileName="Qortium.ini" DirProperty="APPDIR" Section="Java Runtime Environment" Key="JVM Type" Value="favor_server" Action="0" Component_="Qortium.exe"/>
-    <ROW IniFile="MainClass" FileName="Qortium.ini" DirProperty="APPDIR" Section="Java Runtime Environment" Key="Main Class" Value="org.qortal.controller.Controller" Action="0" Component_="Qortium.exe"/>
+    <ROW IniFile="MainClass" FileName="Qortium.ini" DirProperty="APPDIR" Section="Java Runtime Environment" Key="Main Class" Value="org.qortium.controller.Controller" Action="0" Component_="Qortium.exe"/>
     <ROW IniFile="MaximumVersion" FileName="Qortium.ini" DirProperty="APPDIR" Section="Java Runtime Environment" Key="Maximum Version" Value="any" Action="0" Component_="Qortium.exe"/>
     <ROW IniFile="MinimumVersion" FileName="Qortium.ini" DirProperty="APPDIR" Section="Java Runtime Environment" Key="Minimum Version" Value="11" Action="0" Component_="Qortium.exe"/>
     <ROW IniFile="OverrideWorkingDir" FileName="Qortium.ini" DirProperty="APPDIR" Section="Application" Key="Override WorkingDir" Value="yes" Action="0" Component_="Qortium.exe"/>

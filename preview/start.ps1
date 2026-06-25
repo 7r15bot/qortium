@@ -35,7 +35,27 @@ foreach ($Arg in $args) {
 }
 
 function Get-JavaMajorVersion {
-    $VersionOutput = (& java -version) 2>&1 | ForEach-Object { $_.ToString() }
+    $JavaVersionStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $JavaVersionStartInfo.FileName = "java"
+    $JavaVersionStartInfo.Arguments = "-version"
+    $JavaVersionStartInfo.UseShellExecute = $false
+    $JavaVersionStartInfo.RedirectStandardOutput = $true
+    $JavaVersionStartInfo.RedirectStandardError = $true
+
+    $JavaVersionProcess = [System.Diagnostics.Process]::new()
+    $JavaVersionProcess.StartInfo = $JavaVersionStartInfo
+
+    try {
+        $null = $JavaVersionProcess.Start()
+        $VersionOutput = @(
+            $JavaVersionProcess.StandardOutput.ReadToEnd()
+            $JavaVersionProcess.StandardError.ReadToEnd()
+        ) -split "`r?`n" | Where-Object { $_ -ne "" }
+        $JavaVersionProcess.WaitForExit()
+    } finally {
+        $JavaVersionProcess.Dispose()
+    }
+
     $VersionLine = $VersionOutput | Where-Object { $_ -match "version" } | Select-Object -First 1
     if ($VersionLine -notmatch '"([^"]+)"') {
         return $null
@@ -72,11 +92,49 @@ function Find-QortiumJar {
     return $null
 }
 
+function Get-AutoUpdateMode {
+    param([string]$SettingsPath)
+
+    if (-not (Test-Path -LiteralPath $SettingsPath -PathType Leaf)) {
+        return $null
+    }
+
+    try {
+        $Settings = Get-Content -LiteralPath $SettingsPath -Raw | ConvertFrom-Json
+        return $Settings.autoUpdateMode
+    } catch {
+        return $null
+    }
+}
+
+function Set-AutoUpdateMode {
+    param(
+        [string]$SettingsPath,
+        [string]$Mode
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Mode)) {
+        return
+    }
+
+    $Mode = $Mode.ToUpperInvariant()
+    if (@("OFF", "CHECK_ONLY", "NOTIFY", "INSTALL") -notcontains $Mode) {
+        Write-Host "Ignoring invalid local autoUpdateMode: $Mode"
+        return
+    }
+
+    $Settings = Get-Content -LiteralPath $SettingsPath -Raw | ConvertFrom-Json
+    $Settings.autoUpdateMode = $Mode
+    $Settings | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $SettingsPath
+}
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoDir = Split-Path -Parent $ScriptDir
 $RunLog = Join-Path $ScriptDir "run.log"
 $RunErrorLog = Join-Path $ScriptDir "run-error.log"
 $RunPid = Join-Path $ScriptDir "run.pid"
+$AppLog = Join-Path $ScriptDir "qortium.log"
+$Log4jConfig = Join-Path $ScriptDir "log4j2.properties"
 
 if ($Mode -eq "seed-regxa") {
     $SettingsTemplate = Join-Path $ScriptDir "settings-preview-seed.json"
@@ -122,7 +180,14 @@ if ([string]::IsNullOrWhiteSpace($JarPath)) {
     exit 1
 }
 
+$AutoUpdateModeOverride = $env:QORTIUM_PREVIEW_AUTO_UPDATE_MODE
+if ([string]::IsNullOrWhiteSpace($AutoUpdateModeOverride)) {
+    $AutoUpdateModeOverride = Get-AutoUpdateMode -SettingsPath $SettingsLocal
+}
+
 Copy-Item -LiteralPath $SettingsTemplate -Destination $SettingsLocal -Force
+Set-AutoUpdateMode -SettingsPath $SettingsLocal -Mode $AutoUpdateModeOverride
+$AutoUpdateModeEffective = Get-AutoUpdateMode -SettingsPath $SettingsLocal
 
 $JvmMemoryArgString = $env:QORTIUM_PREVIEW_JVM_MEMORY_ARGS
 if ([string]::IsNullOrWhiteSpace($JvmMemoryArgString)) {
@@ -143,13 +208,25 @@ switch ($HeadlessMode) {
     }
 }
 
-$JavaArgs = @("-Djava.net.preferIPv4Stack=false") + $JavaDisplayArgs + $JvmMemoryArgs + @("-jar", $JarPath, $SettingsLocal)
-$Process = Start-Process -FilePath "java" `
-    -ArgumentList $JavaArgs `
-    -WorkingDirectory $ScriptDir `
-    -RedirectStandardOutput $RunLog `
-    -RedirectStandardError $RunErrorLog `
-    -PassThru
+$JavaArgs = @(
+    "-Djava.net.preferIPv4Stack=false",
+    "-Dlog4j.configurationFile=$Log4jConfig",
+    "-Dqortium.log.dir=$ScriptDir"
+) + $JavaDisplayArgs + $JvmMemoryArgs + @("-jar", $JarPath, $SettingsLocal)
+$StartProcessArgs = @{
+    FilePath = "java"
+    ArgumentList = $JavaArgs
+    WorkingDirectory = $ScriptDir
+    RedirectStandardOutput = $RunLog
+    RedirectStandardError = $RunErrorLog
+    PassThru = $true
+}
+
+if ($IsWindows -or $PSVersionTable.PSEdition -eq "Desktop") {
+    $StartProcessArgs.WindowStyle = "Hidden"
+}
+
+$Process = Start-Process @StartProcessArgs
 
 Set-Content -LiteralPath $RunPid -Value $Process.Id
 
@@ -157,9 +234,11 @@ Write-Host "Qortium preview $Mode node running as pid $($Process.Id)"
 Write-Host "Settings file: $SettingsLocal"
 Write-Host "Jar file: $JarPath"
 Write-Host "Display mode: $DisplayModeDescription"
+Write-Host "Auto-update mode: $AutoUpdateModeEffective"
 Write-Host "Console log: $RunLog"
 Write-Host "Error log: $RunErrorLog"
-Write-Host "Application log: $(Join-Path $ScriptDir 'qortium.log')"
+Write-Host "Log4j config: $Log4jConfig"
+Write-Host "Application log: $AppLog"
 Write-Host ""
 Write-Host "Preview genesis and settings are fixed. No minting key was added automatically."
 Write-Host "Next commands:"

@@ -5,8 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_PID="${SCRIPT_DIR}/run.pid"
 APIKEY_FILE="${SCRIPT_DIR}/apikey.txt"
 
-api_port=62391
-stop_timeout=45
+api_port=24891
+stop_timeout=120
+term_grace_timeout=15
 stale_pid=0
 for arg in "$@"; do
 	case "${arg}" in
@@ -45,14 +46,24 @@ fi
 success=0
 if [ -n "${apikey}" ] && command -v curl >/dev/null 2>&1; then
 	echo "Stopping Qortium preview node via API..."
-	if curl --url "http://localhost:${api_port}/admin/stop" -H "X-API-KEY: ${apikey}" >/dev/null 2>&1; then
+	if curl --connect-timeout 2 --max-time 8 --url "http://localhost:${api_port}/admin/stop" -H "X-API-KEY: ${apikey}" >/dev/null 2>&1; then
 		success=1
 	fi
 fi
 
 if [ "${success}" -ne 1 ] && [ -n "${pid}" ]; then
-	echo "Stopping Qortium preview process ${pid}..."
-	if kill -15 "${pid}"; then
+	if ! ps -p "${pid}" >/dev/null 2>&1; then
+		success=1
+	else
+		echo "Stopping Qortium preview process ${pid}..."
+		if kill -15 "${pid}"; then
+			success=1
+		fi
+	fi
+fi
+
+if [ "${success}" -ne 1 ] && [ -n "${pid}" ]; then
+	if ! ps -p "${pid}" >/dev/null 2>&1; then
 		success=1
 	fi
 fi
@@ -74,8 +85,21 @@ if [ -n "${pid}" ]; then
 	while state="$(ps -p "${pid}" -o stat= 2>/dev/null)" && [ -n "${state}" ] && [ "${state}" != "Z" ]; do
 		if [ "${SECONDS}" -ge "${deadline}" ]; then
 			echo
-			echo "Preview node did not stop within ${stop_timeout}s; forcing process ${pid} to exit."
-			kill -9 "${pid}" >/dev/null 2>&1 || true
+			echo "Preview node did not stop within ${stop_timeout}s; asking process ${pid} to terminate."
+			kill -15 "${pid}" >/dev/null 2>&1 || true
+
+			term_deadline="$((SECONDS + term_grace_timeout))"
+			while state="$(ps -p "${pid}" -o stat= 2>/dev/null)" && [ -n "${state}" ] && [ "${state}" != "Z" ]; do
+				if [ "${SECONDS}" -ge "${term_deadline}" ]; then
+					echo
+					echo "Preview node still running after ${term_grace_timeout}s; forcing process ${pid} to exit."
+					kill -9 "${pid}" >/dev/null 2>&1 || true
+					break
+				fi
+
+				echo -n "."
+				sleep 1
+			done
 			break
 		fi
 

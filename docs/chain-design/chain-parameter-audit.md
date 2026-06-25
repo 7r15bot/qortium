@@ -111,9 +111,8 @@ The remaining native-asset work is mostly display and API wording:
 Network magic, runtime defaults, Docker/startup paths, jar naming, Maven
 artifact identity, and Swagger title are already Qortium-oriented.
 
-The Java package namespace and main class still use `org.qortal`. This is broad
-mechanical work and should remain deferred until chain parameters and genesis
-policy are settled.
+The Java package namespace and main class now use `org.qortium`, matching the
+Maven artifact identity and active Qortium runtime naming.
 
 ### Test Chain Fixtures
 
@@ -133,15 +132,14 @@ Recommendation:
 
 ### Cross-Chain And API Naming
 
-Some cross-chain classes and schemas still use Qortal-era naming, including
-fields such as `supportsQortTrades` and descriptions that refer to QORT. These
-are user-facing or compatibility-facing names, not immediate consensus
-parameters.
+The active cross-chain API schema now uses local-chain wording instead of QORT
+wording for supported trade modes. Some deeper cross-chain classes and ACCT
+names still reflect inherited implementation history, but those are not
+immediate consensus parameters.
 
 Recommendation:
 
-- clean schema descriptions and display text first
-- only rename public API fields after choosing a compatibility strategy
+- keep schema descriptions and display text neutral
 - keep ACCT registry cleanup separate from supported foreign-chain inventory
 
 ### UI, QDN, Documentation, And Branding

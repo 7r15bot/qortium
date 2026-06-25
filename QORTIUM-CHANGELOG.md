@@ -34,6 +34,263 @@ own chain.
 
 ## Change Entries
 
+### 2026-06-01 - Add Core-managed direct private chat helpers
+
+Added local API-key-protected helpers for direct private chats so desktop callers can ask Core to resolve recipient public keys, encrypt direct messages, sign and store CHAT transactions, and list direct conversations with decrypted data when the message uses Qortium's new Core-managed direct message format. This keeps private keys inside the trusted local API boundary and gives Qortium Home a safer surface to build direct messaging on without copying QDN app-side crypto.
+
+### 2026-06-01 - Avoid reserved PID variables in the Windows preview stop helper
+
+Renamed the Windows preview stop helper's local process ID variables so they no longer conflict with PowerShell's built-in `$PID` value. This lets the helper read `run.pid`, stop the preview node, and clean up stale PID files without failing before the stop logic runs.
+
+### 2026-06-01 - Capture Java version output safely in the Windows preview launcher
+
+Changed the Windows preview launcher so Java version detection reads the `java -version` output through redirected process streams instead of treating Java's stderr output as a PowerShell error. This keeps the Java 17 check working under strict error handling before Core starts.
+
+### 2026-06-01 - Hide the Windows preview Java process window
+
+Changed the Windows preview launcher so it starts the Java process without leaving a visible command window behind. This keeps Qortium Home's managed Core startup quieter for Windows testers while preserving the same process arguments, working directory, PID file, and preview log files.
+
+### 2026-05-29 - Tighten the coverage profile baseline
+
+Made the coverage profile easier to use and more meaningful for future checks. Running the coverage profile now turns unit tests on automatically, writes the JaCoCo report during verification, ignores generated Zcash protocol stubs that are not useful coverage targets, and raises the minimum coverage levels to better match the current tested codebase.
+
+### 2026-05-29 - Document optional status progress fields
+
+Clarified the `/admin/status` response documentation so apps know that the sync phase is always present, while numeric progress fields can be absent during a fresh startup before Core has learned a peer target height. This matches the existing behavior and helps clients handle the short connecting or stale window without treating it as an error.
+
+### 2026-05-28 - Gossip inbound peer listen addresses
+
+Changed peer discovery so a node that connects inbound can have its advertised listen address treated as recently reachable in memory. This helps preview participants learn about active outside peers through the seed nodes instead of only seeing the fixed seed list, while leaving long-term peer persistence rules unchanged.
+
+### 2026-05-28 - Expose preview render reads publicly
+
+Allowed preview network public API users to read QDN render URLs from the bundled preview settings. This lets Qortium Home and other preview browsers load public APP, WEBSITE, and media resources through `/render` while keeping render authorization and other write-style routes private.
+
+### 2026-05-28 - build(deps): bump io.netty:netty-bom from 4.2.13.Final to 4.2.14.Final
+
+Updated Qortium's Netty networking library bundle from 4.2.13.Final to 4.2.14.Final. This picks up upstream networking fixes while keeping Qortium's own peer protocol, preview ports, and runtime behavior unchanged.
+
+### 2026-05-28 - security: replace java.util.Random with SecureRandom (Q4 + Q5)
+
+Replaced predictable random number generation in QDN request IDs and online-account nonce setup with shared secure random generators. This makes peer-facing request identifiers and minting-related nonce starting points harder to predict without changing the surrounding transaction, block, or QDN behavior.
+
+### 2026-05-28 - security: validate backup name before SQL string interpolation
+
+Added a strict backup-name check before the repository builds its HSQLDB backup command. Current backup callers already use fixed safe names, but this prevents future code from passing names with quotes, path separators, or other unsafe characters into a database command or backup path.
+
+### 2026-05-28 - security: require API key for GET /admin/settings/{setting}
+
+Locked down the single-setting admin read endpoint so it now requires the local API key like other admin controls. This prevents callers with basic API access from reading internal node settings through reflection without authentication, while keeping normal authenticated administration unchanged.
+
+### 2026-05-28 - Give preview stops more time to shut down cleanly
+
+Extended the preview stop helpers so they wait longer for Core to shut down through the API before forcing the Java process to exit. This gives the node more room to finish database, backup, and update-restart cleanup on slower machines or VPS hosts, while still keeping an eventual force-stop fallback for stuck processes.
+
+### 2026-05-27 - Record QDN auto-update retry smoke target
+
+Added a small operator-note update for testing the improved QDN auto-update retry path. This commit is intentionally non-consensus and exists so preview nodes can prove that a single manual `/admin/update` request keeps retrying a missing QDN binary until the resource is ready, while another node can still test automatic `INSTALL` mode.
+
+### 2026-05-27 - Continue QDN auto-update downloads after stalls
+
+Changed manual QDN auto-update installs so a missing binary download keeps retrying after the first `/admin/update` request instead of requiring another operator call. Update status now reports retry progress, stale download state, next retry timing, and active QDN peer count, while the QDN chunk requester refreshes source discovery when a batch has pending chunks but no useful request path.
+
+### 2026-05-27 - Document preview runtime jar replacement
+
+Updated the preview seed operator runbook to call out that `preview/qortium.jar` takes priority over the freshly built jar in `target/`. Operators now have an explicit copy step after building, which prevents a seed from restarting on an older release-style runtime jar by accident.
+
+### 2026-05-27 - Retry stalled QDN chunk downloads
+
+Changed QDN chunk download retry handling so a timed-out chunk request can retry the same source again instead of permanently treating that peer as already tried. Download batches now keep temporarily unavailable chunks pending for another attempt, which matters for preview auto-updates and other QDN resources that may initially have only one reachable holder.
+
+### 2026-05-27 - Record local QDN auto-update smoke target
+
+Added a small operator-note update for the preview network's local QDN auto-update publish test. This commit is intentionally non-consensus and exists so the nodes can test the normal one-step local publish flow with a newer build, separate from the staged seed-hosted update flow.
+
+### 2026-05-27 - Record staged QDN auto-update smoke target
+
+Added a small operator-note update for the next preview auto-update smoke test. This commit is intentionally non-consensus and exists so the preview nodes can test the staged seed-hosted QDN update flow from a newer build without changing chain rules, genesis data, ports, or public API policy.
+
+### 2026-05-27 - Harden QDN auto-update staging and status
+
+Changed QDN auto-update handling so manual install requests only report `INSTALL_STARTED` after the pinned update binary is local, hash verified, and the apply-update helper has been scheduled. If update chunks are still missing, the admin status now reports download preparation and chunk progress instead of pretending the install started, and background install mode retries missing-data updates sooner. The publish helper can also split seed-hosted QDN staging from local signing, letting a restricted seed host update chunks without holding the publishing private key.
+
+### 2026-05-27 - Fix auto-update helper transaction layouts
+
+Updated the QDN auto-update publishing and approval helper scripts for Qortium's current transaction format. The helpers no longer ask the removed address last-reference API for account references, and the AUTO_UPDATE manifest transaction builder now serializes the current ARBITRARY transaction layout directly. This keeps preview auto-update testing aligned with the cleaned-up baseline transaction model.
+
+### 2026-05-27 - Record preview auto-update smoke target
+
+Added a small operator-note update that creates a newer non-consensus build for
+the preview network's first QDN auto-update smoke test. This lets the seed nodes
+exercise approved QDN update install paths without changing chain rules,
+genesis data, public API policy, or runtime behavior beyond the build identity.
+
+### 2026-05-27 - Prepare preview QDN auto-update testing
+
+Prepared the preview network to test approved QDN-based jar updates without
+making automatic installs the default. Preview settings now explicitly keep
+auto-update off, public API rules are tested to keep update install endpoints
+private, the preview launcher preserves a local seed auto-update mode across
+restarts, the background updater checks soon after startup, and the auto-update
+publishing and approval helpers now have preview-friendly zero-fee MemoryPoW
+paths.
+
+### 2026-05-27 - Expose preview node read APIs
+
+Changed the default preview participant and seed profiles so preview nodes can
+serve limited public read-only API and QDN browsing requests while keeping
+write, admin, utility, list-management, and peer mutation routes local-only.
+Public API path matching now supports prefix wildcards, allowing Home and other
+clients to discover usable public nodes from the initial preview network.
+
+### 2026-05-27 - Accept same-block QDN publish and delete
+
+Fixed QDN block validation so a synced node can accept a block that publishes
+and then deletes the same resource in transaction order. This prevents nodes
+that did not already have both unconfirmed transactions from rejecting an
+otherwise valid block, and makes preview sync stalls easier to diagnose by
+logging the exact transaction validation reason at normal info level.
+
+### 2026-05-27 - Document preview first-sync expectations
+
+Clarified the public preview tester guide so new testers know that `status --wait`
+only means the local API is reachable, and that a fresh preview node may still
+need a few minutes to find peers and sync from genesis. This sets expectations
+for the current no-snapshot preview flow without adding bootstrap or snapshot
+support yet.
+
+### 2026-05-27 - Fix preview release logging
+
+Fixed the preview launcher and release package so application logs are written
+reliably to `preview/qortium.log` and launcher output is captured in
+`preview/run.log`. The preview package now includes a smoke check that extracts
+the tester zip, starts a temporary headless node, and verifies both logs are
+created before a release is published.
+
+### 2026-05-27 - Improve admin status sync progress
+
+Expanded the node status response with a clearer sync target height, remaining block count, and sync phase so clients can explain first-run catch-up and stale-node states more accurately. The existing sync percentage is still available for compatibility, but active synchronization no longer reports 100 percent complete while the node is still behind its known target height.
+
+### 2026-05-27 - Fix CHAT typed JSON builder requests
+
+Fixed the CHAT transaction builder so clients can submit either the existing endpoint-style JSON payload or a full transaction-style JSON payload that includes `"type": "CHAT"`. Malformed JAXB/MOXy request bodies are now reported as bad requests instead of falling through as server errors, which gives clients a clearer failure when a submitted JSON body cannot be parsed.
+
+### 2026-05-26 - Document public preview readiness checks
+
+Expanded the public preview tester guide with local status, peer, seed-status, and troubleshooting checks, and added a seed-operator runbook for updating, starting, stopping, firewalling, verifying, and resetting public preview seed nodes. The preview release package now includes both tester and operator guidance so public testing can start from the same repeatable instructions used for the current seed-node setup.
+
+### 2026-05-26 - Fix stale chain catch-up beyond summary batches
+
+Fixed stale chain catch-up when a node is more than one block-summary batch behind reachable peers. Nodes now accept partial peer-summary batches during comparison instead of wrongly expecting the peer's latest tip inside the partial response, and stale catch-up minting now defers to any valid newer peer tip instead of treating a previously filtered tip as permission to mint a local fork.
+
+### 2026-05-26 - Expose limited read-only seed API endpoints
+
+Added a public API allowlist for preview seed nodes so external clients can read only `GET /admin/status` and `GET /peers/known` while the normal API remains restricted to local administration. The Regxa and Netcup seed profiles now enable that limited read-only access for public discovery without exposing settings, logs, peer mutation, or other API routes.
+
+### 2026-05-26 - Limit long MemoryPoW benchmarks to active difficulties
+
+Reduced the optional long MemoryPoW benchmark tests so they stop at difficulty 12, which is the highest difficulty currently used by Qortium's configured fee-alternative settings. This keeps the benchmark useful for active preview parameters without spending many extra minutes on difficulty levels that are not currently user-facing.
+
+### 2026-05-26 - Fix transaction and API test regressions
+
+Fixed several regressions uncovered by the broader test run after recent preview and transaction changes. QDN delete transactions now validate and orphan cleanly when the delete transaction is already in the unconfirmed pool, delete tombstones no longer try to relocate missing data files, AT account lookups now handle invalid public-key bytes safely for read-style checks, and the affected API, chat, message, and QDN tests now assert the current configured behavior.
+
+### 2026-05-26 - Drain queued handshake messages after each handshake task
+
+Fixed a peer-handshake scheduling edge case where multiple handshake messages could be read from a socket at once, but only the first message was scheduled for processing. Follow-up handshake messages that are already queued are now processed after the previous handshake task clears its pending flag, preventing QDN data peers from getting stuck before completion.
+
+### 2026-05-26 - Treat already-stopped preview nodes as stopped
+
+Improved the preview stop script so it treats a node as successfully stopped if the API shutdown request already caused the process to exit before the script reaches the fallback kill step. This removes confusing restart failures during normal preview maintenance.
+
+### 2026-05-26 - Bound preview stop API shutdown requests
+
+Added a timeout to the preview stop script's API shutdown request so a node that accepts the stop command but never closes the HTTP request cannot block the rest of the restart flow. The script can now fall back to process termination and continue with a clean restart instead of hanging indefinitely.
+
+### 2026-05-26 - Keep QDN peer ports distinct from blockchain peer ports
+
+Fixed QDN peer discovery so a blockchain peer and QDN data peer on the same host are treated as distinct endpoints when they use different ports. Preview nodes can now learn and connect to seed QDN ports such as `24894` even when the same seed is already known on the blockchain peer port `24892`.
+
+### 2026-05-26 - Refresh preview genesis timestamp after startup fix
+
+Refreshed the preview genesis timestamp again after the fresh-startup fix was applied. This keeps the final three-node preview reset close to the current clock without changing any other chain settings.
+
+### 2026-05-26 - Allow fresh preview startup with no QDN resources
+
+Fixed fresh-node startup when the QDN resource cache has no rows to update. Empty preview chains now skip empty latest-signature update and deletion batches instead of stopping before the API starts, allowing a reset chain to initialize cleanly.
+
+### 2026-05-26 - Refresh preview genesis timestamp for public reset
+
+Refreshed the preview network genesis timestamp for the next public reset. This lets the three-node preview setup start from a recent chain origin instead of immediately entering stale catch-up mode, while keeping the rest of the preview chain configuration unchanged.
+
+### 2026-05-26 - Reset Qortium Core version to 1.0.0
+
+Reset Qortium Core's active release version to 1.0.0 for the new Qortium baseline. The Maven build version, default peer compatibility floor, preview and testnet peer-version settings, installer metadata, and active version tests now agree on the 1.0.0 line so freshly rebuilt nodes can connect after the preview chain reset.
+
+### 2026-05-26 - Standardize Qortium image resources
+
+Standardized the remaining Qortium image resource filenames and locations so app icons, tray icons, and installer artwork are easier to understand and maintain. Runtime icons now live under clear app and tray resource folders, stale runtime ICO references were removed, and the Windows installer banner uses a direct Qortium installer filename.
+
+### 2026-05-26 - Replace Qortium icon assets
+
+Replaced the remaining inherited application, tray, and Windows installer artwork with the prepared Qortium icon set. The stale splash image and unreferenced installer bitmap were removed so packaged resources no longer carry old branding that is not used by the current desktop or installer flows.
+
+### 2026-05-26 - Document reserved transaction type IDs
+
+Documented the historical transaction type IDs that Qortium is keeping reserved instead of compacting away. Former airdrop, account flag, forging enablement, and account level transaction IDs are now recorded as reserved metadata while remaining inactive, so future work can intentionally revisit those concepts without old or removed transaction IDs being accepted as valid transactions today.
+
+### 2026-05-26 - Reset Qortium archive format baseline
+
+Reset Qortium's block archive serialization baseline so archive version 1 now uses the current compact block layout with AT state hashes. The old per-AT-state archive layout and version 2 archive default were removed from archive reads, writes, rebuilds, serialized block export, and tests, keeping the archive format versioning system ready for future changes without carrying inherited compatibility paths.
+
+### 2026-05-26 - Reset Qortium network protocol baseline
+
+Reset Qortium's peer network protocol baseline so the current capability-aware handshake and compact block, block-summary, peer-list, signature, and online-account messages are the only active formats. The old version-suffixed message classes and peer-version fallback branches were removed or renamed to baseline names, so nodes now rely on Qortium chain identity and minimum-version checks instead of carrying inherited wire-format compatibility paths.
+
+### 2026-05-26 - Reset Qortium transaction version baseline
+
+Reset Qortium's transaction version baseline to version 1 while keeping the current transaction layouts. The old timestamp gate for transaction version 6 was removed, typed AT transactions are now always serialized with their payment-or-message type, and arbitrary transactions now always use the current resource/payment layout under the new baseline.
+
+### 2026-05-26 - Reset Qortium block version baseline
+
+Reset Qortium's block version baseline from the inherited version 4 marker to version 1. New genesis and minted blocks now use the Qortium baseline version directly, chain configs no longer need to carry a block-version field, and an old pre-version-2 feature gate was removed because version 1 now represents the current Qortium block format.
+
+### 2026-05-26 - Reset HSQLDB baseline schema version
+
+Reset the fresh Qortium HSQLDB baseline to schema version 1 now that all current tables are part of the baseline schema. Existing repositories that still report the temporary version 2 state are no longer accepted as current, which keeps the new baseline clean while preserving the update system for future database changes after a chain is started.
+
+### 2026-05-26 - Prefer synchronization during stale chain catch-up
+
+Changed stale chain catch-up so a node that can see a clearly newer peer tip will defer local minting and synchronize first. During stale catch-up, synchronizer peer selection now prefers the highest and newest eligible peer tip instead of picking randomly, reducing the chance that a delayed node creates avoidable local fork blocks while a better seed chain is already reachable.
+
+### 2026-05-26 - Raise preview outbound peer target
+
+Raised the preview network's outbound peer target so tester and seed profiles try to keep two peer connections instead of stopping after one. This gives preview nodes a better chance of staying connected to both public seed paths while keeping the blockchain peer minimum low enough for small-network testing.
+
+### 2026-05-26 - Remove remaining non-image Qortal text
+
+Cleaned up the last active non-image Qortal wording found outside historical and provenance notes. A fresh-database error now refers to inherited upstream database versions, and crypto test messages and temporary paths now use Qortium naming.
+
+### 2026-05-26 - Rename Java package namespace to Qortium
+
+Renamed the active Java package namespace from `org.qortal` to `org.qortium` across source code, tests, build settings, runtime entrypoints, logging config, tools, and installer metadata. This removes one of the last active Qortal identity markers from normal builds and stack traces while keeping historical fork-provenance notes and foreign-coin server defaults unchanged.
+
+### 2026-05-26 - Remove package namespace from public test commands
+
+Updated public testing docs so Maven examples use simple test class selectors instead of the inherited `org.qortal` Java package path. This keeps the remaining package namespace detail out of normal user-facing verification commands while leaving the actual runtime Java package and main class unchanged for a later, larger refactor.
+
+### 2026-05-26 - Remove remaining active Qortal branding
+
+Removed several active Qortal-era names from the public-facing Qortium tree. The command-line helper is now named `qortium` instead of `qort`, the remaining `qortal.ico` resource was replaced with a Qortium-named icon, cross-chain API metadata now says `supportsLocalChainTrades` instead of `supportsQortTrades`, and older test strings and active docs were adjusted to use neutral Qortium wording. Historical provenance notes, upstream-reference docs, foreign-coin server defaults, and the deferred `org.qortal` Java package namespace remain unchanged.
+
+### 2026-05-26 - Move Qortium network ports to Qortium ranges
+
+Changed Qortium's default network ports away from the inherited Qortal ranges. Mainnet now uses the `1489x` range and testnet or preview profiles use the `2489x` range for API, peer, developer proxy, and QDN traffic. The preview and testnet settings, scripts, Docker profiles, helper tools, and setup docs were updated together so new nodes, seed nodes, and local tooling all agree on the Qortium-specific ports.
+
+### 2026-05-26 - Add on-chain QDN resource deletion
+
+Added an on-chain delete method for QDN resources so a name owner can publish a deletion record instead of only replacing a resource with empty files. Deleted resources are removed from the searchable resource cache, stay hidden across cache rebuilds, can be restored by orphaning the delete transaction, and can be republished later with a new PUT. The API now has builders for unsigned delete transactions while the existing local delete endpoint remains focused on clearing cached or hosted data from the local node.
+
 ### 2026-05-25 - preview: add second public seed profile
 
 Added the Netcup preview seed at `185.207.104.78` alongside the existing Regxa seed at `146.103.42.59`. Preview participants now start with both seed nodes in their peer list, seed operators have separate launch profiles for each public IP, the seed profiles know about each other, and preview genesis includes a separate Netcup minting authorization. The preview packaging, reset scripts, docs, and local ignored seed-key notes now include the second seed configuration.

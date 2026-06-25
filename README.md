@@ -10,8 +10,8 @@ networking, build tooling, and the early Qortium documentation set.
 ## Current Status
 
 Qortium is active development software for builders and testers. It is not yet
-packaged as a polished end-user application, and some inherited Qortal/QDN
-terminology still appears in older docs and APIs while the fork is cleaned up.
+packaged as a polished end-user application, and some inherited documentation
+and workflows are still being cleaned up.
 
 For a plain-language history of the fork work, start with
 [QORTIUM-CHANGELOG.md](QORTIUM-CHANGELOG.md).
@@ -46,7 +46,7 @@ Start the local testnet and confirm that it is minting blocks:
 The local testnet API listens at:
 
 ```text
-http://localhost:62391
+http://localhost:24891
 ```
 
 Stop it with:
@@ -74,7 +74,8 @@ The preview scaffold is connection-ready and includes three public genesis
 minting authorizations for initial seed/local testing. Private minting keys are
 not committed. Public testers should start with
 [preview/TESTER-GUIDE.md](preview/TESTER-GUIDE.md); seed operators and
-minting-key setup should use [preview/README.md](preview/README.md).
+minting-key setup should use [preview/README.md](preview/README.md) and
+[preview/OPERATOR-RUNBOOK.md](preview/OPERATOR-RUNBOOK.md).
 
 ## Local Node Build And Run
 
@@ -130,7 +131,7 @@ mvn -q test
 For IDE runs, use Java 17 and the main class:
 
 ```text
-org.qortal.controller.Controller
+org.qortium.controller.Controller
 ```
 
 Use `settings.json` as the program argument when running a normal local node.

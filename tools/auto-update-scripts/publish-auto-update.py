@@ -21,6 +21,7 @@ AUTO_UPDATE_SERVICE_ID = 1
 AUTO_UPDATE_MANIFEST_MAGIC = bytes([0x51, 0x41, 0x55, 0x31])  # QAU1
 SIGNATURE_HEX_LENGTH = 128
 XOR_VALUE = 0x5a
+STAGED_BINARY_SCHEMA = 1
 
 
 def abort(message):
@@ -78,6 +79,7 @@ def decoded_update_sha256_hex(path):
 
 def api_key_from_default_locations():
     candidates = [
+        Path("preview") / "apikey.txt",
         Path("apikey.txt"),
         Path.home() / "qortium" / "apikey.txt",
     ]
@@ -126,9 +128,6 @@ class QortiumApi:
     def address_from_public_key(self, public_key):
         return self.request("GET", f"/addresses/convert/{public_key}")
 
-    def last_reference(self, address):
-        return self.request("GET", f"/addresses/lastreference/{address}")
-
     def build_qdn_upload(self, qdn_name, identifier, update_file, fee):
         service = quote(QDN_UPDATE_SERVICE, safe="")
         name = quote(qdn_name, safe="")
@@ -176,16 +175,12 @@ def build_manifest_hex(timestamp, commit_hash, update_hash, binary_signature_hex
 def build_manifest_transaction_hex(api, private_key, tx_group_id, manifest_hex, fee):
     public_key = api.get_public_key(private_key)
     public_key_hex = api.from_base58(public_key)
-    address = api.address_from_public_key(public_key)
-    reference = api.last_reference(address)
-    reference_hex = api.from_base58(reference)
 
     data_length = len(manifest_hex) // 2
     raw_tx_parts = [
         "0000000a",                              # type 10 ARBITRARY
         f"{int(time.time() * 1000):016x}",       # current timestamp
         f"{tx_group_id:08x}",                    # dev group ID
-        reference_hex,
         public_key_hex,
         "00000000",                              # nonce, filled by /arbitrary/compute
         "00000000",                              # name length
@@ -205,6 +200,74 @@ def build_manifest_transaction_hex(api, private_key, tx_group_id, manifest_hex, 
     return "".join(raw_tx_parts)
 
 
+def write_staged_binary(path, args, commit_hash, timestamp, update_hash, qdn_unsigned_tx):
+    payload = {
+        "schema": STAGED_BINARY_SCHEMA,
+        "commitHash": commit_hash,
+        "timestamp": timestamp,
+        "updateHash": update_hash,
+        "qdnService": QDN_UPDATE_SERVICE,
+        "qdnName": args.qdn_name,
+        "identifier": args.identifier or commit_hash,
+        "qdnPath": QDN_UPDATE_PATH,
+        "txGroupId": args.tx_group_id,
+        "manifestFee": args.manifest_fee,
+        "unsignedBinaryTransaction": qdn_unsigned_tx,
+    }
+
+    staged_path = Path(path)
+    staged_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return staged_path
+
+
+def read_staged_binary(path):
+    staged_path = Path(path)
+    if not staged_path.is_file():
+        abort(f"Staged binary transaction file not found: {staged_path}")
+
+    try:
+        payload = json.loads(staged_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        abort(f"Invalid staged binary transaction JSON: {e}")
+
+    required = [
+        "schema",
+        "commitHash",
+        "timestamp",
+        "updateHash",
+        "qdnService",
+        "qdnName",
+        "identifier",
+        "qdnPath",
+        "txGroupId",
+        "manifestFee",
+        "unsignedBinaryTransaction",
+    ]
+    missing = [field for field in required if field not in payload]
+    if missing:
+        abort(f"Staged binary transaction is missing fields: {', '.join(missing)}")
+
+    if payload["schema"] != STAGED_BINARY_SCHEMA:
+        abort(f"Unsupported staged binary transaction schema: {payload['schema']}")
+    if payload["qdnService"] != QDN_UPDATE_SERVICE:
+        abort(f"Unsupported staged QDN service: {payload['qdnService']}")
+    if payload["qdnPath"] != QDN_UPDATE_PATH:
+        abort(f"Unsupported staged QDN update path: {payload['qdnPath']}")
+    if len(payload["commitHash"]) != 40:
+        abort("Staged commit hash must be the full 20-byte Git hash")
+    if len(payload["updateHash"]) != 64:
+        abort("Staged decoded update JAR SHA-256 must be 32 bytes")
+
+    try:
+        payload["timestamp"] = int(payload["timestamp"])
+        payload["txGroupId"] = int(payload["txGroupId"])
+        payload["manifestFee"] = int(payload["manifestFee"])
+    except (TypeError, ValueError):
+        abort("Staged timestamp, txGroupId, and manifestFee must be integers")
+
+    return payload
+
+
 def countdown(message, enabled=True):
     if not enabled:
         return
@@ -220,20 +283,50 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Publish a Qortium auto-update through QDN")
     parser.add_argument("arg1", nargs="?", help="Private key OR commit hash")
     parser.add_argument("arg2", nargs="?", help="Commit hash if arg1 was the private key")
+    parser.add_argument("--preview", action="store_true", help="Use preview defaults: port 24891, tx group 1, and zero fees")
     parser.add_argument("--host", default="localhost", help="API host")
-    parser.add_argument("--port", type=int, default=12391, help="API port")
+    parser.add_argument("--port", type=int, help="API port")
     parser.add_argument("--api-key", default=os.environ.get("QORTIUM_API_KEY"), help="API key for restricted API calls")
     parser.add_argument("--qdn-name", default=QDN_UPDATE_NAME, help="QDN name that owns the update binary resource")
     parser.add_argument("--identifier", help="QDN identifier for the update binary, defaults to full commit hash")
-    parser.add_argument("--tx-group-id", type=int, default=1, help="Development group transaction group ID")
-    parser.add_argument("--binary-fee", type=int, default=0, help="Fee for the QDN binary transaction in atomic units")
-    parser.add_argument("--manifest-fee", type=int, default=1_000_000, help="Fee for the AUTO_UPDATE manifest transaction in atomic units")
+    parser.add_argument("--tx-group-id", type=int, help="Development group transaction group ID")
+    parser.add_argument("--binary-fee", type=int, help="Fee for the QDN binary transaction in atomic units")
+    parser.add_argument("--manifest-fee", type=int, help="Fee for the AUTO_UPDATE manifest transaction in atomic units")
+    staging = parser.add_mutually_exclusive_group()
+    staging.add_argument("--stage-binary-out", help="Write an unsigned, nonce-computed QDN binary transaction JSON for signing/submission elsewhere")
+    staging.add_argument("--staged-binary", help="Sign and submit a staged QDN binary transaction JSON, then build and submit the AUTO_UPDATE manifest")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be published without creating transactions")
     parser.add_argument("--yes", action="store_true", help="Submit without the five second cancellation pause")
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.preview:
+        args.port = 24891 if args.port is None else args.port
+        args.tx_group_id = 1 if args.tx_group_id is None else args.tx_group_id
+        args.binary_fee = 0 if args.binary_fee is None else args.binary_fee
+        args.manifest_fee = 0 if args.manifest_fee is None else args.manifest_fee
+    else:
+        args.port = 14891 if args.port is None else args.port
+        args.tx_group_id = 1 if args.tx_group_id is None else args.tx_group_id
+        args.binary_fee = 0 if args.binary_fee is None else args.binary_fee
+        args.manifest_fee = 0 if args.manifest_fee is None else args.manifest_fee
+
+    return args
 
 
 def resolve_private_key_and_commit(args):
+    if args.stage_binary_out:
+        return None, args.arg1
+
+    if args.staged_binary:
+        if args.arg1 and args.arg2:
+            return args.arg1, args.arg2
+        if args.arg1:
+            if commit_exists(args.arg1):
+                return getpass.getpass("Enter your Base58 private key: "), args.arg1
+            return args.arg1, None
+
+        return getpass.getpass("Enter your Base58 private key: "), None
+
     if args.dry_run and not args.arg2:
         if args.arg1 and commit_exists(args.arg1):
             return None, args.arg1
@@ -255,6 +348,49 @@ def main():
     git_root = run(["git", "rev-parse", "--show-toplevel"])
     os.chdir(git_root)
 
+    if args.staged_binary:
+        private_key, _ = resolve_private_key_and_commit(args)
+        staged = read_staged_binary(args.staged_binary)
+
+        print(f"Commit:         {staged['commitHash']}")
+        print(f"Build time ms:  {staged['timestamp']}")
+        print(f"Decoded JAR SHA-256: {staged['updateHash']}")
+        print(f"Staged QDN binary: {staged['qdnService']}/{staged['qdnName']}/{staged['identifier']}")
+        print(f"Manifest group: {staged['txGroupId']}")
+        print(f"API endpoint:   {args.host}:{args.port}")
+        print(f"Fees:           manifest={staged['manifestFee']}")
+
+        if args.dry_run:
+            print("\nDry run: staged QDN binary and AUTO_UPDATE manifest would be signed and submitted.")
+            return
+
+        api = QortiumApi(args.host, args.port, args.api_key or api_key_from_default_locations())
+        print("\nSigning staged QDN binary transaction...")
+        qdn_signed_tx = api.sign_transaction(private_key, staged["unsignedBinaryTransaction"])
+        qdn_signature_hex = api.signature_hex_from_signed_transaction(qdn_signed_tx)
+        qdn_signature58 = api.to_base58(qdn_signature_hex)
+        print(f"QDN binary transaction signature: {qdn_signature58}")
+
+        manifest_hex = build_manifest_hex(staged["timestamp"], staged["commitHash"], staged["updateHash"], qdn_signature_hex)
+        print(f"Manifest payload bytes: {len(manifest_hex) // 2}")
+
+        print("Building AUTO_UPDATE manifest transaction...")
+        manifest_tx_hex = build_manifest_transaction_hex(api, private_key, staged["txGroupId"], manifest_hex, staged["manifestFee"])
+        manifest_unsigned_tx = api.to_base58(manifest_tx_hex)
+        manifest_unsigned_tx = api.compute_nonce(manifest_unsigned_tx)
+        manifest_signed_tx = api.sign_transaction(private_key, manifest_unsigned_tx)
+        manifest_signature_hex = api.signature_hex_from_signed_transaction(manifest_signed_tx)
+        manifest_signature58 = api.to_base58(manifest_signature_hex)
+        print(f"AUTO_UPDATE manifest transaction signature: {manifest_signature58}")
+
+        countdown("\nSubmitting staged binary and manifest transactions in 5 seconds. Press CTRL+C to cancel.", not args.yes)
+        api.process_transaction(qdn_signed_tx)
+        api.process_transaction(manifest_signed_tx)
+
+        print("\nSubmitted successfully.")
+        print("The AUTO_UPDATE manifest must still be approved by the configured development group.")
+        return
+
     private_key, commit_arg = resolve_private_key_and_commit(args)
     project = get_project_name()
     commit_hash, timestamp = resolve_commit(commit_arg)
@@ -273,6 +409,8 @@ def main():
     print(f"Decoded JAR SHA-256: {update_hash}")
     print(f"QDN binary:     {QDN_UPDATE_SERVICE}/{args.qdn_name}/{identifier}")
     print(f"Manifest group: {args.tx_group_id}")
+    print(f"API endpoint:   {args.host}:{args.port}")
+    print(f"Fees:           binary={args.binary_fee}, manifest={args.manifest_fee}")
 
     if args.dry_run:
         print("\nDry run: no QDN binary or AUTO_UPDATE manifest transaction was built or submitted.")
@@ -285,6 +423,13 @@ def main():
     print("\nBuilding QDN binary transaction...")
     qdn_unsigned_tx = api.build_qdn_upload(args.qdn_name, identifier, update_file, args.binary_fee)
     qdn_unsigned_tx = api.compute_nonce(qdn_unsigned_tx)
+
+    if args.stage_binary_out:
+        staged_path = write_staged_binary(args.stage_binary_out, args, commit_hash, timestamp, update_hash, qdn_unsigned_tx)
+        print(f"Staged unsigned QDN binary transaction: {staged_path}")
+        print("Sign and submit it from an unrestricted signing node with --staged-binary.")
+        return
+
     qdn_signed_tx = api.sign_transaction(private_key, qdn_unsigned_tx)
     qdn_signature_hex = api.signature_hex_from_signed_transaction(qdn_signed_tx)
     qdn_signature58 = api.to_base58(qdn_signature_hex)
